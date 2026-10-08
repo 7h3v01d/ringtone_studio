@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ringtone Studio</title>
+<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.js"></script>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f4f5f8;--card:#fff;--tx:#14161c;--mu:#6b7080;--ac:#ff3b5c;--bd:#e3e5ec;--wv:#c9cdd8;--sel:#ff3b5c}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1014;--card:#1a1c23;--tx:#f1f2f6;--mu:#9296a6;--bd:#2a2d37;--wv:#4a4e5c}}
+:root[data-theme="dark"]{--bg:#0f1014;--card:#1a1c23;--tx:#f1f2f6;--mu:#9296a6;--bd:#2a2d37;--wv:#4a4e5c}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+main{max-width:760px;margin:0 auto;padding:18px 14px 40px}
+h1{font-size:22px;margin:4px 0 2px}h2{font-size:15px;margin:0 0 10px}
+.sub{color:var(--mu);margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:14px}
+.drop{border:2px dashed var(--bd);border-radius:12px;padding:26px;text-align:center;color:var(--mu);cursor:pointer}
+.drop.on{border-color:var(--ac);color:var(--ac)}
+canvas{width:100%;height:120px;display:block;border-radius:10px;background:var(--bg);touch-action:none;cursor:ew-resize}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+label{font-size:12px;color:var(--mu);display:flex;flex-direction:column;gap:3px;flex:1;min-width:110px}
+input[type=text],input[type=number]{font:inherit;padding:8px 10px;border-radius:9px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);width:100%}
+input[type=range]{width:100%;accent-color:var(--ac)}
+button{font:inherit;font-weight:600;border:0;border-radius:10px;padding:9px 14px;background:var(--bg);color:var(--tx);border:1px solid var(--bd);cursor:pointer}
+button.p{background:var(--ac);color:#fff;border-color:var(--ac)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.sm{padding:6px 10px;font-size:13px}
+.lib{display:flex;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--bd);flex-wrap:wrap}
+.lib:first-of-type{border-top:0}
+.lib .n{flex:1;min-width:120px;font-weight:600;overflow:hidden;text-overflow:ellipsis}
+.lib .n small{display:block;color:var(--mu);font-weight:400}
+.tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.tabs button.a{background:var(--ac);color:#fff;border-color:var(--ac)}
+ol{margin:0;padding-left:20px}li{margin:5px 0}
+.note{font-size:13px;color:var(--mu);margin-top:8px}
+#msg{font-size:13px;margin-top:8px;min-height:18px;color:var(--mu)}
+</style></head><body><main>
+<h1>🔔 Ringtone Studio</h1>
+<p class="sub">Trim any song, add fades, export an iPhone-ready <b>.m4r</b>, manage your tones, and send them to your phone.</p>
+
+<div class="card" id="loadCard">
+ <div class="drop" id="drop">Drop an audio file here or tap to choose<br><small>MP3, M4A, WAV, AAC, FLAC…</small></div>
+ <input type="file" id="file" accept="audio/*" hidden>
+</div>
+
+<div class="card"><h2>🔎 Find free sounds</h2>
+ <div class="row" style="margin-top:0"><label style="flex:3">What kind of sound?<input type="text" id="fq" value="ringtone" placeholder="marimba, bells, funky, birds…"></label></div>
+ <div class="tabs" id="fsrc" style="margin:10px 0 0"></div>
+ <div class="tabs" id="chips" style="margin:10px 0 0"></div>
+ <div class="row"><button class="sm p" id="fall">Open all 5 sites</button><span class="note" style="margin:0">If only one tab opens, allow pop-ups for this page.</span></div>
+ <div class="note">Opens the site in a new tab. Download the file, then drop it into the box above. Check each file's licence — these sites list it on every page.</div></div>
+
+<div class="card" id="edCard" hidden>
+ <h2>Edit</h2>
+ <canvas id="cv"></canvas>
+ <div class="row">
+  <label>Start (s)<input type="number" id="st" min="0" step="0.1"></label>
+  <label>Length (s) – max 40<input type="number" id="ln" min="1" max="40" step="0.1"></label>
+  <label>Fade in <input type="range" id="fi" min="0" max="5" step="0.1" value="0.3"></label>
+  <label>Fade out <input type="range" id="fo" min="0" max="5" step="0.1" value="1"></label>
+ </div>
+ <div class="row"><label>Volume <span id="vv">100%</span><input type="range" id="vol" min="50" max="300" step="5" value="100"></label>
+  <label style="flex:0 0 auto;flex-direction:row;align-items:center;gap:6px;color:var(--tx)"><input type="checkbox" id="nz"> Auto-boost quiet songs</label>
+  <button class="sm" id="zs">🔍 Zoom to selection</button><button class="sm" id="za">Show all</button></div>
+ <div class="row"><span style="font-size:12px;color:var(--mu)">Length:</span><button class="sm" data-pl="15">15s</button><button class="sm" data-pl="20">20s</button><button class="sm" data-pl="30">30s</button><button class="sm" data-pl="40">40s</button>
+  <label style="min-width:90px;flex:0 1 110px">✂ Cut from (s)<input type="number" id="cf" min="0" step="0.1" placeholder="e.g. 8"></label><label style="min-width:90px;flex:0 1 110px">to (s)<input type="number" id="ct" min="0" step="0.1" placeholder="e.g. 20"></label><button class="sm" id="cc">Clear cut</button></div>
+ <div class="note" id="fl"></div>
+ <div class="row"><label style="flex:2">Tone name<input type="text" id="nm" value="My Ringtone"></label>
+  <button id="play">▶ Preview</button><button class="p" id="exp">Export &amp; save</button></div>
+ <div id="msg"></div>
+</div>
+
+<div class="card"><h2>My tones</h2><div id="lib"></div><div class="note" id="sendNote"></div><div class="note" id="empty">No tones yet — export one above.</div></div>
+
+<div class="card"><h2>Get it onto your iPhone</h2>
+ <p class="note" style="margin-top:0">Browsers can't write to an iPhone over USB, and iOS doesn't install ringtones straight from a web page. These are the supported routes:</p>
+ <div class="tabs" id="tabs"><button class="a" data-t="0">Mac (Finder)</button><button data-t="1">Windows</button><button data-t="2">iPhone only</button></div>
+ <div id="tb"></div>
+ <p class="note">After transfer: Settings → Sounds &amp; Haptics → Ringtone → pick your tone (listed at the top under “Ringtones”). Tones must be 40 s or shorter — the editor enforces this.</p>
+</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const TR=[
+`<ol><li>Tap <b>Share / AirDrop</b> on a tone below to send the .m4r to your Mac (or download it).</li><li>Connect the iPhone by cable and open <b>Finder</b>; select your iPhone in the sidebar and trust the device.</li><li>Drag the .m4r file onto the iPhone window (General tab). It copies into <b>Tones</b> immediately.</li></ol>`,
+`<ol><li>Easiest: use the helper (Install-Shortcut.bat once), then tap <b>📲 Send to iPhone</b> on a tone with iTunes installed and the phone plugged in.</li><li>Or download the .m4r.</li><li>Open the <b>Apple Devices</b> app (or iTunes), and connect your iPhone.</li><li>Choose your iPhone → <b>Tones</b> (or On My Device → Tones) and drag the file in.</li></ol>`,
+`<ol><li>Use <b>Share</b> to save the file to <b>Files</b> (or AirDrop it to yourself).</li><li>Open <b>GarageBand</b>, create an Audio Recorder project, switch to Tracks view, and tap the loop icon → Files → import your file.</li><li>Trim to ≤40 s, then My Songs → long-press the project → <b>Share → Ringtone</b> → Export, then “Use sound as…”.</li></ol>`];
+function tab(i){[...$('tabs').children].forEach(b=>b.classList.toggle('a',b.dataset.t==i));$('tb').innerHTML=TR[i]}
+$('tabs').onclick=e=>{if(e.target.dataset.t)tab(e.target.dataset.t)};tab(0);
+
+// ---- IndexedDB library ----
+let db;const dbp=new Promise(r=>{try{const q=indexedDB.open('ringtones',1);q.onupgradeneeded=()=>q.result.createObjectStore('t',{keyPath:'id'});q.onsuccess=()=>{db=q.result;r()};q.onerror=()=>r()}catch(e){r()}});
+const mem=[];
+async function all(){await dbp;if(!db)return mem;return new Promise(r=>{const q=db.transaction('t').objectStore('t').getAll();q.onsuccess=()=>r(q.result.sort((a,b)=>b.id-a.id));q.onerror=()=>r(mem)})}
+async function put(o){await dbp;if(!db){mem.unshift(o);return}return new Promise(r=>{const t=db.transaction('t','readwrite');t.objectStore('t').put(o);t.oncomplete=r;t.onerror=r})}
+async function del(id){await dbp;if(!db){const i=mem.findIndex(x=>x.id==id);if(i>=0)mem.splice(i,1);return}return new Promise(r=>{const t=db.transaction('t','readwrite');t.objectStore('t').delete(id);t.oncomplete=r})}
+let audioEl=null;
+function fmt(s){return s.toFixed(1)+'s'}
+function mkFile(t){return new File([t.blob],t.name.replace(/[\\/:*?"<>|]/g,'')+'.m4r',{type:'audio/mp4'})}
+async function render(){
+ const l=await all();$('empty').hidden=l.length>0;$('lib').innerHTML='';
+ l.forEach(t=>{const d=document.createElement('div');d.className='lib';
+  d.innerHTML=`<div class="n">${t.name.replace(/</g,'&lt;')}<small>${fmt(t.dur)} · ${(t.blob.size/1024).toFixed(0)} KB</small></div>`;
+  const B=(txt,fn)=>{const b=document.createElement('button');b.className='sm';b.textContent=txt;b.onclick=fn;d.appendChild(b)};
+  B('▶',()=>{if(audioEl)audioEl.pause();audioEl=new Audio(URL.createObjectURL(t.blob));audioEl.play()});
+  B('📲 Send to iPhone',()=>sendPhone(t));
+  B('Share',async()=>{const f=mkFile(t);try{if(navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],title:t.name});else dl(t)}catch(e){if(e.name!='AbortError')dl(t)}});
+  B('Download',()=>dl(t));
+  B('Rename',async()=>{const n=prompt('New name',t.name);if(n){t.name=n;await put(t);render()}});
+  B('✕',async()=>{if(confirm('Delete "'+t.name+'"?')){await del(t.id);render()}});
+  $('lib').appendChild(d)})
+}
+function sendPhone(t){dl(t);const n=mkFile(t).name;$('sendNote').textContent='Downloading… then handing it to the Windows helper. If nothing opens, run Install-Shortcut.bat from the helper folder once (Windows + iTunes only).';
+ setTimeout(()=>{location.href='ringtonesender://send?name='+encodeURIComponent(n)},1500)}
+function dl(t){const f=mkFile(t),a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.appendChild(a);a.click();a.remove()}
+
+// ---- Editor ----
+let buf=null,S=0,L=30,peaks=[],src=null,V0=0,V1=1,PH=null,NB=20000;const cv=$('cv'),cx=cv.getContext('2d');
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function setBuf(b,name){buf=b;S=0;L=Math.min(30,b.duration);V0=0;V1=b.duration;$('edCard').hidden=false;$('nm').value=name.replace(/\.[^.]+$/,'').slice(0,40);
+ const ch=b.getChannelData(0),step=Math.max(1,Math.floor(ch.length/NB));peaks=new Float32Array(NB);
+ for(let i=0;i<NB;i++){let m=0;for(let j=i*step;j<(i+1)*step&&j<ch.length;j+=4)m=Math.max(m,Math.abs(ch[j]));peaks[i]=m}
+ sync();draw()}
+function sync(){$('st').value=S.toFixed(1);$('ln').value=L.toFixed(1);$('ln').max=Math.min(40,buf.duration-S).toFixed(1);info()}
+function draw(){if(!buf)return;const r=cv.getBoundingClientRect(),dpr=devicePixelRatio||1;cv.width=r.width*dpr;cv.height=r.height*dpr;
+ const w=cv.width,h=cv.height,D=buf.duration,vs=V1-V0,X=t=>(t-V0)/vs*w;cx.clearRect(0,0,w,h);
+ const x1=X(S),x2=X(S+L);cx.fillStyle='rgba(255,59,92,.14)';cx.fillRect(x1,0,x2-x1,h);
+ const bw=2*dpr,cols=Math.floor(w/bw);
+ for(let c=0;c<cols;c++){const t0=V0+c/cols*vs,t1=V0+(c+1)/cols*vs,i0=Math.floor(t0/D*NB),i1=Math.max(i0+1,Math.ceil(t1/D*NB));let m=0;for(let i=i0;i<i1&&i<NB;i++)m=Math.max(m,peaks[i]);
+  const x=c*bw,ph=Math.max(1,m*h*.9);cx.fillStyle=(x>=x1&&x<=x2)?css('--sel'):css('--wv');cx.fillRect(x,(h-ph)/2,bw-1,ph)}
+ if(cutOK()){cx.fillStyle='rgba(20,22,28,.6)';cx.fillRect(X(S+CF),0,X(S+CT)-X(S+CF),h)}
+ cx.fillStyle=css('--sel');cx.fillRect(x1-2,0,4*dpr,h);cx.fillRect(x2-2,0,4*dpr,h);
+ cx.fillStyle=css('--mu');cx.font=(11*dpr)+'px sans-serif';cx.fillText(V0.toFixed(1)+'s',4,12*dpr);cx.fillText(V1.toFixed(1)+'s',w-46*dpr,12*dpr);
+ if(PH!=null){cx.fillStyle=css('--tx');cx.fillRect(X(PH),0,2*dpr,h)}}
+$('zs').onclick=()=>{if(!buf)return;const p=L*.25;V0=Math.max(0,S-p);V1=Math.min(buf.duration,S+L+p);draw()};
+$('za').onclick=()=>{if(!buf)return;V0=0;V1=buf.duration;draw()};
+$('vol').oninput=()=>$('vv').textContent=$('vol').value+'%';
+let CF=null,CT=null;
+function cutOK(){return CF!=null&&CT!=null&&CF>=.5&&CT>CF+.05&&CT<=L-.5}
+function info(){if(!buf)return;$('fl').textContent=cutOK()?`Final length: ${(L-(CT-CF)).toFixed(1)}s — the cut section is removed with a smooth join.`:'Cut times count from the start of your selection (e.g. skip 8–20 s of it).'}
+function rdCut(){const a=parseFloat($('cf').value),b=parseFloat($('ct').value);CF=isNaN(a)?null:a;CT=isNaN(b)?null:b;info();draw()}
+$('cf').oninput=$('ct').oninput=rdCut;
+$('cc').onclick=()=>{$('cf').value=$('ct').value='';rdCut()};
+document.querySelectorAll('[data-pl]').forEach(b=>b.onclick=()=>{if(!buf)return;L=Math.min(+b.dataset.pl,buf.duration-S);sync();draw()});
+let drag=0;
+function pos(e){const r=cv.getBoundingClientRect();return V0+Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*(V1-V0)}
+cv.onpointerdown=e=>{if(!buf)return;cv.setPointerCapture(e.pointerId);const t=pos(e);drag=Math.abs(t-S)<Math.abs(t-(S+L))?1:2;mv(e)};
+cv.onpointermove=e=>{if(drag)mv(e)};cv.onpointerup=()=>drag=0;
+function mv(e){const t=pos(e),D=buf.duration;
+ if(drag==1){const end=S+L;S=Math.max(0,Math.min(t,end-1));S=Math.max(S,end-40);L=end-S}
+ else{L=Math.max(1,Math.min(40,t-S,D-S))}
+ sync();draw()}
+$('st').onchange=()=>{S=Math.max(0,Math.min(+$('st').value||0,buf.duration-1));L=Math.min(L,buf.duration-S);sync();draw()};
+$('ln').onchange=()=>{L=Math.max(1,Math.min(40,+$('ln').value||1,buf.duration-S));sync();draw()};
+addEventListener('resize',draw);
+
+async function loadFile(f){if(!f)return;$('msg').textContent='';
+ try{const ac=new (window.AudioContext||window.webkitAudioContext)();const b=await ac.decodeAudioData(await f.arrayBuffer());ac.close();setBuf(b,f.name)}
+ catch(e){alert('Could not decode that file. Try MP3, M4A or WAV.')}}
+$('drop').onclick=()=>$('file').click();$('file').onchange=e=>loadFile(e.target.files[0]);
+$('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('on')};
+$('drop').ondragleave=()=>$('drop').classList.remove('on');
+$('drop').ondrop=e=>{e.preventDefault();$('drop').classList.remove('on');loadFile(e.dataTransfer.files[0])};
+
+function getClip(){if(!cutOK())return{b:buf,s:S,l:L};
+ const sr=buf.sampleRate,nc=buf.numberOfChannels,X=Math.floor(.03*sr),a0=Math.floor(S*sr),a1=Math.floor((S+CF)*sr),b0=Math.floor((S+CT)*sr),b1=Math.min(buf.length,Math.floor((S+L)*sr)),n1=a1-a0,n2=b1-b0,tot=n1+n2-X;
+ const nb=new AudioBuffer({length:tot,numberOfChannels:nc,sampleRate:sr});
+ for(let c=0;c<nc;c++){const d=buf.getChannelData(c),o=nb.getChannelData(c);
+  for(let i=0;i<n1-X;i++)o[i]=d[a0+i];
+  for(let i=0;i<X;i++){const f=i/X;o[n1-X+i]=d[a1-X+i]*(1-f)+d[b0+i]*f}
+  for(let i=X;i<n2;i++)o[n1-X+i]=d[b0+i]}
+ return{b:nb,s:0,l:tot/sr}}
+function gainVal(C){let G=$('vol').value/100;
+ if($('nz').checked){let pk=0;const b=C.b,a=Math.floor(C.s*b.sampleRate),e=Math.min(b.length,Math.floor((C.s+C.l)*b.sampleRate));
+  for(let c=0;c<b.numberOfChannels;c++){const d=b.getChannelData(c);for(let i=a;i<e;i+=3)pk=Math.max(pk,Math.abs(d[i]))}
+  if(pk>0.01)G*=Math.min(8,.95/pk)}return G}
+function build(ctx,t,C){C=C||getClip();const g=ctx.createGain(),G=gainVal(C),fi=+$('fi').value,fo=+$('fo').value,l=C.l;
+ g.gain.setValueAtTime(fi?0:G,t);if(fi)g.gain.linearRampToValueAtTime(G,t+fi);
+ if(fo){g.gain.setValueAtTime(G,t+Math.max(fi,l-fo));g.gain.linearRampToValueAtTime(0,t+l)}
+ const lim=ctx.createDynamicsCompressor();lim.threshold.value=-2;lim.knee.value=0;lim.ratio.value=20;lim.attack.value=.003;lim.release.value=.1;
+ const s=ctx.createBufferSource();s.buffer=C.b;s.connect(g).connect(lim).connect(ctx.destination);s.start(t,C.s,C.l);return s}
+let pac=null;
+function stopPrev(){if(src){try{src.onended=null;src.stop()}catch(e){}src=null}PH=null;$('play').textContent='▶ Preview';draw()}
+$('play').onclick=()=>{if(src){stopPrev();return}
+ pac=pac||new (window.AudioContext||window.webkitAudioContext)();pac.resume();
+ const t0=pac.currentTime;src=build(pac,t0);src.onended=stopPrev;$('play').textContent='■ Stop';
+ (function tick(){if(!src)return;const p=pac.currentTime-t0;PH=cutOK()?(p<CF?S+p:S+CT+(p-CF)):S+p;draw();requestAnimationFrame(tick)})()};
+
+$('exp').onclick=async()=>{
+ const m=$('msg');
+ if(!('AudioEncoder' in window)||!window.Mp4Muxer){m.textContent='This browser can’t encode AAC. Use Safari 16.4+, Chrome or Edge.';return}
+ const sr=44100,cfg={codec:'mp4a.40.2',sampleRate:sr,numberOfChannels:2,bitrate:128000};
+ try{const s=await AudioEncoder.isConfigSupported(cfg);if(!s.supported)throw 0}catch(e){m.textContent='AAC encoding isn’t supported by this browser/device. Try Safari or Chrome on a Mac/PC.';return}
+ $('exp').disabled=true;m.textContent='Encoding…';
+ try{
+  const C=getClip(),len=Math.round(C.l*sr),oc=new OfflineAudioContext(2,len,sr);build(oc,0,C);
+  const out=await oc.startRendering(),mux=new Mp4Muxer.Muxer({target:new Mp4Muxer.ArrayBufferTarget(),audio:{codec:'aac',numberOfChannels:2,sampleRate:sr},fastStart:'in-memory'});
+  const enc=new AudioEncoder({output:(c,md)=>mux.addAudioChunk(c,md),error:e=>{throw e}});enc.configure(cfg);
+  const l=out.getChannelData(0),r=out.getChannelData(1),B=4096;
+  for(let i=0;i<len;i+=B){const n=Math.min(B,len-i),d=new Float32Array(n*2);d.set(l.subarray(i,i+n));d.set(r.subarray(i,i+n),n);
+   enc.encode(new AudioData({format:'f32-planar',sampleRate:sr,numberOfFrames:n,numberOfChannels:2,timestamp:Math.round(i/sr*1e6),data:d}))}
+  await enc.flush();mux.finalize();
+  const blob=new Blob([mux.target.buffer],{type:'audio/mp4'});
+  await put({id:Date.now(),name:$('nm').value.trim()||'Ringtone',dur:C.l,blob});
+  m.textContent='Saved to My tones ✓ — now share or download it below.';render();
+ }catch(e){m.textContent='Export failed: '+(e&&e.message||e)}
+ $('exp').disabled=false};
+const SRC=[['Pixabay',q=>'https://pixabay.com/sound-effects/search/'+q+'/'],
+['Freesound (CC0)',q=>'https://freesound.org/search/?q='+q+'&f=license%3A%22Creative+Commons+0%22'],
+['Internet Archive',q=>'https://archive.org/search?query='+q+'&and%5B%5D=mediatype%3A%22audio%22'],
+['Wikimedia Commons',q=>'https://commons.wikimedia.org/w/index.php?search='+q+'+filetype%3Aaudio&ns6=1'],
+['Mixkit (browse)',()=>'https://mixkit.co/free-sound-effects/']];
+SRC.forEach(([n])=>{const a=document.createElement('a');a.textContent=n;a.target='_blank';a.rel='noopener noreferrer';
+ a.style.cssText='text-decoration:none;font-weight:600;padding:7px 12px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font-size:13px';$('fsrc').appendChild(a)});
+function fsr(){const q=encodeURIComponent(($('fq').value.trim()||'ringtone'));[...$('fsrc').children].forEach((a,i)=>a.href=SRC[i][1](q))}
+$('fq').oninput=fsr;fsr();
+['marimba','xylophone','bells','chime','funky','retro phone','piano','harp','guitar','synth','birds','jazz'].forEach(w=>{const c=document.createElement('button');c.className='sm';c.textContent=w;c.onclick=()=>{$('fq').value=w;fsr()};$('chips').appendChild(c)});
+$('fall').onclick=()=>{fsr();[...$('fsrc').children].forEach(a=>window.open(a.href,'_blank','noopener'))};
+render();
+</script></body></html>
